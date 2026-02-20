@@ -1,0 +1,11 @@
+# Cartelle pesanti o locali
+data/
+models_saved/
+__pycache__/
+.ipynb_checkpoints/
+.vscode/
+
+# Ambienti virtuali
+venv/
+env/
+ls/
