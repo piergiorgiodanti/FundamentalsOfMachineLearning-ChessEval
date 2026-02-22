@@ -116,7 +116,7 @@ class ChessEncoder:
         if en_passant != '-':
             ep_col = ord(en_passant[0]) - ord('a')
             ep_row = 8 - int(en_passant[1])
-            # Controlliamo che le coordinate siano nei limiti (sicurezza)
+            # Controlliamo coordinate per sicurezza
             if 0 <= ep_row < 8 and 0 <= ep_col < 8:
                 tensor[BoardLayer.EN_PASSANT, ep_row, ep_col] = 1
 
