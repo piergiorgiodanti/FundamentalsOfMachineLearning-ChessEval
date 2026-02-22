@@ -1,4 +1,6 @@
 import torch
+from torch.utils.data import Dataset, DataLoader
+import pandas as pd
 
 from enum import IntEnum
 
@@ -128,4 +130,40 @@ class ChessEncoder:
         """
         return torch.tanh(torch.tensor(score_cp / 400.0, dtype=torch.float32))
 
+class ChessDataset(Dataset):
+    
+    def __init__(self, csv_file):
+        self.data = pd.read_csv(csv_file)
+        self.encoder = ChessEncoder()
+    
+    # Override 
+    def __len__(self):
+        """
+        Restitusice la lunghezza del dataset
+        """
+        return len(self.data)
 
+    # Override 
+    def __getitem__(self, index):
+        """
+        Restitusice l'i-esimo elemento del dataset in seguito all'encoding
+        """
+        fen = self.data.iloc[index]['FEN']
+
+        # Gestione delle valutazioni del motore (Stockfish)
+        # Nel dataset di Kaggle, le posizioni possono avere due tipi di punteggio:
+        # 1. Centipedoni (es. "150"): un intero che indica il vantaggio.
+        # 2. Matto forzato (es. "#3"): una stringa che indica il matto in N mosse.
+        score = self.data.iloc[index]['Evaluation']
+
+        if isinstance(score, str) and '#' in score:
+            # Se il punteggio contiene '#', siamo in una situazione di matto forzato.
+            # Non potendo usare il numero di mosse per la regressione, assegniamo 
+            # un valore convenzionale estremo (10.000 centipedoni).
+            # Il segno '-' indica se il matto è a favore del Nero.
+            score = -1000 if '-' in score else 1000
+        else:
+            score = float(score)
+
+        return self.encoder.process_entry(fen, score)
+    
