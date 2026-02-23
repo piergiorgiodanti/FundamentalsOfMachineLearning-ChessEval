@@ -2,9 +2,11 @@ import pygame
 import chess
 import torch
 from src.data_utils import ChessEncoder
+from src.models import ChessEval
 
 # Inizzalizzazione Pygame
 pygame.init()
+encode = ChessEncoder()
 WITDH, HEIGHT = 600, 600 # Dimensioni finestra
 BOARD_SIZE = 600
 SQ_SIZE = BOARD_SIZE // 8
@@ -66,7 +68,6 @@ def handle_move(board, current_selected_sq):
             board.push(chess.Move(current_selected_sq, clicked_sq, promotion=chess.QUEEN))
             
         # vediamo se la codifica del tensore gasa
-        encode = ChessEncoder()
         x,y = encode.process_entry(board.fen(),400)
 
         return None # per la prossima mossa
@@ -74,6 +75,17 @@ def handle_move(board, current_selected_sq):
     return current_selected_sq
 
 def main():
+
+    # carica il modello
+    device = torch.device("cpu")
+    model = ChessEval().to(device)
+    try:
+        model.load_state_dict(torch.load("src/chess_model.pth", map_location=device))
+        model.eval()
+        print("Modello caricato")
+    except:
+        print("Modello non trovato")
+
     screen = pygame.display.set_mode((WITDH, HEIGHT))
     pygame.display.set_caption("chess eval")
     clock = pygame.time.Clock()
@@ -83,18 +95,29 @@ def main():
     running = True
     while running:
         for event in pygame.event.get():
+            
+            old_fen = board.fen()
+
             if event.type == pygame.QUIT:
                 running = False
 
             if event.type == pygame.MOUSEBUTTONDOWN:
                 selected_sq = handle_move(board, selected_sq)
+            
+            # Se la posizione della scacchiera è diversa si calcola il vantaggio
+            if board.fen() != old_fen:
+                with torch.no_grad():
+                    tensor_input = encode.encode(board.fen()).unsqueeze(0).to(device)
+                    output = model(tensor_input)
+                    score = output.item()
+                
+                print(f"score: {score}")
+                
 
         draw_board(screen)
         draw_pieces(screen, board)
         pygame.display.flip()
-        clock.tick(FPS)   
-
-        
+        clock.tick(FPS)        
     
     pygame.quit()
 
