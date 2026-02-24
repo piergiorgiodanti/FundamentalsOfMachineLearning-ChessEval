@@ -30,6 +30,6 @@ class ChessEval(nn.Module):
 
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
-        x = self.fc3(x)
+        x = torch.tanh(self.fc3(x)) # in modo da avere output [-1,1]
         return x
         

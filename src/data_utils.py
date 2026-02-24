@@ -159,9 +159,9 @@ class ChessDataset(Dataset):
         if isinstance(score, str) and '#' in score:
             # Se il punteggio contiene '#', siamo in una situazione di matto forzato.
             # Non potendo usare il numero di mosse per la regressione, assegniamo 
-            # un valore convenzionale estremo (10.000 centipedoni).
+            # un valore convenzionale estremo (100.000 centipedoni).
             # Il segno '-' indica se il matto è a favore del Nero.
-            score = -1000 if '-' in score else 1000
+            score = -100000 if '-' in score else 100000
         else:
             score = float(score)
 

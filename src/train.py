@@ -38,8 +38,9 @@ for epoch in range(1):
     
     running_loss = 0.0
     net.train()
-
+    
     for i, data in enumerate(trainloader, 0):
+        
         inputs, labels = data
         inputs, labels = inputs.to(device), labels.to(device).float()
         
@@ -47,7 +48,7 @@ for epoch in range(1):
 
         outputs = net(inputs)
 
-        loss_val = criterion(outputs.view(-1), labels)
+        loss_val = criterion(outputs.view(-1), labels.view(-1))
 
         loss_val.backward()
         optimizer.step()
@@ -60,9 +61,19 @@ for epoch in range(1):
         if i % 500 == 499:
             # salva i pesi del modello
             torch.save(net.state_dict(), "chess_model.pth")
-    
 
+    # --- FASE DI TESTING (VALIDATION) ---
+    net.eval()  # Mette la rete in modalità valutazione
+    test_loss = 0.0
+    with torch.no_grad():  
+        for data in testloader:
+            inputs, labels = data
+            inputs, labels = inputs.to(device), labels.to(device).float()
+            
+            outputs = net(inputs)
+            loss_val = criterion(outputs.view(-1), labels)
+            test_loss += loss_val.item()
+            
+    print(f'Fine Epoca {epoch + 1} - Average Test Loss: {test_loss / len(testloader):.3f}')
+        
 print('Finished Training')
-
-
-

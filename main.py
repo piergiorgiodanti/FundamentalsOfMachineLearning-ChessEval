@@ -67,7 +67,6 @@ def handle_move(board, current_selected_sq):
         elif chess.Move(current_selected_sq, clicked_sq, promotion=chess.QUEEN) in board.legal_moves:
             board.push(chess.Move(current_selected_sq, clicked_sq, promotion=chess.QUEEN))
             
-        # vediamo se la codifica del tensore gasa
         x,y = encode.process_entry(board.fen(),400)
 
         return None # per la prossima mossa
@@ -109,11 +108,11 @@ def main():
                 with torch.no_grad():
                     tensor_input = encode.encode(board.fen()).unsqueeze(0).to(device)
                     output = model(tensor_input)
-                    score = output.item()
-                
+                    
+                    score = output.item() 
+
                 print(f"score: {score}")
                 
-
         draw_board(screen)
         draw_pieces(screen, board)
         pygame.display.flip()
