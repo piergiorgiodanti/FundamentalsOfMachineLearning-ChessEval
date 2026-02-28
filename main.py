@@ -1,13 +1,11 @@
 import pygame
 import chess
 import torch
-from src.data_utils import ChessEncoder
-from src.models import ChessEval
+from src.data_utils import PerspectiveResEncoder
+from src.models import ChessEval, ChessResNet
 
-# Inizzalizzazione Pygame
 pygame.init()
-encode = ChessEncoder()
-WITDH, HEIGHT = 600, 600 # Dimensioni finestra
+WITDH, HEIGHT = 600, 600
 BOARD_SIZE = 600
 SQ_SIZE = BOARD_SIZE // 8
 FPS = 60
@@ -66,8 +64,6 @@ def handle_move(board, current_selected_sq):
         # se è una promozione:
         elif chess.Move(current_selected_sq, clicked_sq, promotion=chess.QUEEN) in board.legal_moves:
             board.push(chess.Move(current_selected_sq, clicked_sq, promotion=chess.QUEEN))
-            
-        x,y = encode.process_entry(board.fen(),400)
 
         return None # per la prossima mossa
     
@@ -77,13 +73,15 @@ def main():
 
     # carica il modello
     device = torch.device("cpu")
-    model = ChessEval().to(device)
+    model = ChessResNet().to(device)
+    path_modello = "src/chess_model2.pth" 
     try:
-        model.load_state_dict(torch.load("src/chess_model.pth", map_location=device))
+        model.load_state_dict(torch.load(path_modello, map_location=device))
         model.eval()
         print("Modello caricato")
     except:
         print("Modello non trovato")
+    encode = PerspectiveResEncoder()
 
     screen = pygame.display.set_mode((WITDH, HEIGHT))
     pygame.display.set_caption("chess eval")
@@ -109,9 +107,9 @@ def main():
                     tensor_input = encode.encode(board.fen()).unsqueeze(0).to(device)
                     output = model(tensor_input)
                     
-                    score = output.item() 
-
-                print(f"score: {score}")
+                    score = encode.denormalize_score(output, 'w' if board.turn == chess.WHITE else 'b')
+                    
+                print(f"score: {score/100}") # / 100 per avere punti tipo chess
                 
         draw_board(screen)
         draw_pieces(screen, board)
