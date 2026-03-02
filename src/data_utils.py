@@ -24,7 +24,7 @@ class BaseChessEncoder(ABC):
         """Normalizzazione del punteggio centipedonale nell'intervallo [-1, 1]."""
         return torch.tanh(torch.tensor(score_cp / self.scale, dtype=torch.float32))
 
-    def denormalize_score(self, model_output: torch.Tensor) -> float:
+    def denormalize_score(self, model_output: torch.Tensor, turn = None) -> float:
         """Conversione dell'output del modello in valore centipedonale."""
         val = torch.atanh(torch.clamp(model_output, -0.999, 0.999)).item()
         return val * self.scale

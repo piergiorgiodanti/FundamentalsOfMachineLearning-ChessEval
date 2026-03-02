@@ -83,3 +83,41 @@ class ChessResNet(nn.Module):
         x = self.dropout1(x)
         
         return torch.tanh(self.fc2(x))
+    
+class DeepChessNet(nn.Module):
+    def __init__(self, num_blocks=20):
+        super().__init__()
+        
+        self.first_layer = nn.Sequential(
+            nn.Conv2d(17, 256, kernel_size=3, padding=1),
+            nn.BatchNorm2d(256),
+            nn.ReLU()
+        )
+
+        self.res_tower = nn.Sequential(
+            *[ResidualBlock(256) for _ in range(num_blocks)]
+        )
+
+        self.reduction = nn.Sequential(
+            nn.Conv2d(256, 64, kernel_size=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+            nn.Flatten()
+        )
+
+        self.fc1 = nn.Linear(4096, 1024)
+        self.fc2 = nn.Linear(1024, 512)
+        self.dropout1 = nn.Dropout(0.3)
+
+        self.fc3 = nn.Linear(512, 1)
+
+    def forward(self, x):
+        x = self.first_layer(x)
+        x = self.res_tower(x)
+        x = self.reduction(x)
+        
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = self.dropout1(x)
+        
+        return torch.tanh(self.fc3(x))
