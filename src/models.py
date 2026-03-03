@@ -84,7 +84,7 @@ class ChessResNet(nn.Module):
         
         return torch.tanh(self.fc2(x))
     
-class DeepChessNet(nn.Module):
+class DeepChessResNet(nn.Module):
     def __init__(self, num_blocks=20):
         super().__init__()
         

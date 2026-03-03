@@ -2,7 +2,7 @@ import pygame
 import chess
 import torch
 from src.data_utils import PerspectiveResEncoder, StaticFlatEncoder
-from src.models import ChessEval, ChessResNet
+from src.models import ChessEval, ChessResNet, DeepChessResNet
 
 pygame.init()
 WITDH, HEIGHT = 600, 600
@@ -115,8 +115,8 @@ if __name__ == "__main__":
     # path_modello = "src/chess_model.pth" 
 
     encode = PerspectiveResEncoder()
-    model = ChessResNet().to(device)
-    path_modello = "src/chess_model2.pth" 
+    model = DeepChessResNet().to(device)
+    path_modello = "src/chess_model3.pth" 
 
     try:
         model.load_state_dict(torch.load(path_modello, map_location=device))
