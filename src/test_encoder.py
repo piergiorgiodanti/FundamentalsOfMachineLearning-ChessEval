@@ -1,12 +1,12 @@
 import unittest 
 import torch
-from data_utils import StaticFlatEncoder, PerspectiveResEncoder
+from data_utils import StaticFlatVectorizer, PerspectiveVectorizer
 
 class TestBaseEncoderLogic(unittest.TestCase):
     """Test della logica comune definita nella classe base."""
     
     def setUp(self):
-        self.encoder = StaticFlatEncoder(scale=400.0)
+        self.encoder = StaticFlatVectorizer(scale=400.0)
 
     def test_normalize_score(self):
         score = 100.0
@@ -29,7 +29,7 @@ class TestBaseEncoderLogic(unittest.TestCase):
 class TestStaticFlatEncoder(unittest.TestCase):
 
     def setUp(self):
-        self.encoder = StaticFlatEncoder()
+        self.encoder = StaticFlatVectorizer()
 
     def test_full_board_mapping_static(self):
         # P in a8, N in b7, B in c6, R in d5, Q in e4, K in f3 (Bianchi)
@@ -93,7 +93,7 @@ class TestStaticFlatEncoder(unittest.TestCase):
 class TestPerspectiveResEncoder(unittest.TestCase):
     
     def setUp(self):
-        self.encoder = PerspectiveResEncoder()
+        self.encoder = PerspectiveVectorizer()
 
     def test_full_board_mapping_prespective_whites_turn(self):
         # P in a8, N in b7, B in c6, R in d5, Q in e4, K in f3 (Bianchi)

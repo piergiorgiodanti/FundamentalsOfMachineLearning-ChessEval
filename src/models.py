@@ -2,7 +2,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch
 
-class ChessEval(nn.Module):
+class ChessVanillaCNN(nn.Module):
     def __init__(self):
         super().__init__()
         
@@ -31,8 +31,7 @@ class ChessEval(nn.Module):
     def forward(self, x):
         x = self.conv(x)
         return self.fc(x)
-    
-        
+            
 class ResidualBlock(nn.Module):
     def __init__(self, channels):
         super().__init__()
@@ -85,6 +84,7 @@ class ChessResNet(nn.Module):
         return torch.tanh(self.fc2(x))
     
 class DeepChessResNet(nn.Module):
+
     def __init__(self, num_blocks=20):
         super().__init__()
         
@@ -121,3 +121,52 @@ class DeepChessResNet(nn.Module):
         x = self.dropout1(x)
         
         return torch.tanh(self.fc3(x))
+    
+class TransformerChessEval(nn.Module):
+    
+    def __init__(self, embed_dim=256, num_heads=8, num_layers=8):
+        super().__init__()
+
+        self.input_projection = nn.Linear(17, embed_dim)
+
+        # Parametri che cambiano durante il training per imparare le 
+        # relazioni spaziali, dato che il trasformer non è in grando 
+        # di comprenderli da solo
+        self.pos_embedding = nn.Parameter(torch.randn(1, 64, embed_dim) * 0.02)
+
+        # Encoder-Stack
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=embed_dim,
+            nhead=num_heads,
+            dim_feedforward=embed_dim*4,
+            batch_first=True,
+            norm_first=True
+        )
+
+        self.traformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers, enable_nested_tensor=False)
+
+        self.mlp_head = nn.Sequential(
+            nn.Linear(embed_dim, 128),
+            nn.ReLU(),
+            nn.Linear(128,1),
+            nn.Tanh() # [-1,1]
+        )
+
+    def forward(self, x):
+        """
+        Si prende x shape: (batch, 17, 8, 8)
+        """
+
+        # Appiattisce (8, 8) --> 64
+        x = x.flatten(2).transpose(1,2)
+
+        # Proiezione lineare + Posizione
+        x = self.input_projection(x) + self.pos_embedding
+
+        # Passaggio nello stack di Encoder
+        x = self.traformer_encoder(x)
+
+        # Media le intuizioni su tutte le 64 case
+        x = x.mean(dim=1)
+
+        return self.mlp_head(x)

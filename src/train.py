@@ -1,125 +1,115 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader, Dataset, random_split
+from torch.utils.data import DataLoader, random_split
 import os
-import subprocess
+import gc
 
-# Import dal tuo progetto
-from models import DeepChessNet, ChessResNet # Ho aggiunto entrambi per sicurezza
-from data_utils import ChessDataset, PerspectiveResEncoder
+from models import ChessVanillaCNN, ChessResNet, DeepChessResNet, TransformerChessEval
+from data_utils import ChessDataset, PerspectiveVectorizer, StaticFlatVectorizer
 
-def git_push_weights(filepath, loss_val, epoch):
-    """
-    Funzione per committare e pushare automaticamente i pesi su GitHub.
-    """
-    try:
-        subprocess.run(["git", "add", filepath], check=True)
-        message = f"Update weights Epoch {epoch+1} - Loss: {loss_val:.5f}"
-        subprocess.run(["git", "commit", "-m", message], check=True)
-        subprocess.run(["git", "push", "origin", "main"], check=True)
-        print(f"Pesi inviati a GitHub con successo.")
-    except Exception as e:
-        print(f"Errore durante il Git Push: {e}")
+STEPS_PRINT = 100
+BATCH_SIZE = 2048
+EPOCHS = 10
+DATA_PATH = "../data/chessData.csv"
 
-def training_and_validation(path_model, model: nn.Module, dataset: Dataset, device="cpu", 
-                            batch_size: int = 1024, train_size=0.9, epochs=50):
-    
-    train_len = int(train_size * len(dataset))
-    test_len = len(dataset) - train_len
-    trainset, testset = random_split(dataset, [train_len, test_len])
-
-    trainloader = DataLoader(trainset, batch_size=batch_size, shuffle=True, 
-                             num_workers=4, pin_memory=True)
-    testloader = DataLoader(testset, batch_size=batch_size, shuffle=False, 
-                            num_workers=4, pin_memory=True)
+def training_loop(path_model, model, train_set, test_set, device, lr):
+    train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=4, pin_memory=True)
+    test_loader = DataLoader(test_set, batch_size=BATCH_SIZE, shuffle=False, num_workers=4, pin_memory=True)
 
     net = model.to(device)
 
-    # Caricamento pesi esistenti
     if os.path.exists(path_model):
-        print(f"Carico i pesi esistenti da '{path_model}'")
+        print(f"Ripristino pesi da: {path_model}")
         net.load_state_dict(torch.load(path_model, map_location=device))
-    else:
-        print(f"Nessun file trovato in {path_model}, inizio training da zero.")
 
     criterion = nn.MSELoss()
-    # AdamW è ottimo per le ResNet profonde
-    optimizer = optim.AdamW(net.parameters(), lr=0.0005, weight_decay=1e-5)
-    
-    # Scheduler: riduce il LR se la loss smette di scendere
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=2, factor=0.5)
+    optimizer = optim.AdamW(net.parameters(), lr=lr, weight_decay=1e-5)
+
+    scaler = torch.amp.GradScaler('cuda')
 
     best_test_loss = float('inf')
-    early_stop_patience = 5
+    patience = 3
     trigger_times = 0
 
-    for epoch in range(epochs):
+    for epoch in range(EPOCHS):
         net.train()
         running_loss = 0.0
-        
-        for i, (inputs, labels) in enumerate(trainloader):
-            inputs, labels = inputs.to(device), labels.to(device).float().view(-1, 1)
-            
-            optimizer.zero_grad()
-            outputs = net(inputs)
-            loss_val = criterion(outputs, labels)
-            
-            loss_val.backward()
-            optimizer.step()
 
-            running_loss += loss_val.item()
-            if i % 100 == 99:
-                print(f'[{epoch + 1}, {i + 1:5d}] Loss: {running_loss / 100:.5f}')
+        for i, (inputs, labels) in enumerate(train_loader):
+            inputs, labels = inputs.to(device), labels.to(device).float().view(-1, 1)
+
+            optimizer.zero_grad()
+
+            with torch.amp.autocast('cuda'):
+                outputs = net(inputs)
+                loss = criterion(outputs, labels)
+
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+
+            running_loss += loss.item()
+            if i % STEPS_PRINT == (STEPS_PRINT - 1):
+                print(f'[Epoca {epoch + 1}, Batch {i + 1}] Loss: {running_loss / STEPS_PRINT:.4f}')
                 running_loss = 0.0
-            
-        # Validation Phase
+
+        # Validation
         net.eval()
         test_loss = 0.0
-        with torch.no_grad():  
-            for inputs, labels in testloader:
+        with torch.no_grad(), torch.amp.autocast('cuda'):
+            for inputs, labels in test_loader:
                 inputs, labels = inputs.to(device), labels.to(device).float().view(-1, 1)
                 outputs = net(inputs)
-                loss_val = criterion(outputs, labels)
-                test_loss += loss_val.item()
-                
-        avg_test_loss = test_loss / len(testloader)
-        print(f' Fine Epoca {epoch + 1} - Average Test Loss: {avg_test_loss:.5f}')
-            
-        # Scheduler Step
-        scheduler.step(avg_test_loss)
+                test_loss += criterion(outputs, labels).item()
 
-        if avg_test_loss < best_test_loss:
-            best_test_loss = avg_test_loss
+        avg_loss = test_loss / len(test_loader)
+        print(f'>>> Fine Epoca {epoch + 1} - Val Loss: {avg_loss:.4f}')
+
+        if avg_loss < best_test_loss:
+            best_test_loss = avg_loss
             torch.save(net.state_dict(), path_model)
+            print("Modello salvato.")
             trigger_times = 0
-            print(f" Avarage Loss Test migliorata. Pesi salvati in {path_model}.")
-            
-            # git psuh 
-            git_push_weights(path_model, avg_test_loss, epoch)
         else:
             trigger_times += 1
-            print(f"Nessun miglioramento per {trigger_times} epoche")
-            if trigger_times >= early_stop_patience:
-                print("Early Stopping attivato.")
+            if trigger_times >= patience:
+                print("Early Stopping.")
                 break
 
-    print('Training Completato.')
+    # Pulizia memoria per prossimo modello
+    del net, optimizer, train_loader, test_loader
+    gc.collect()
+    torch.cuda.empty_cache()
+
+def main():
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Esecuzione su: {device}")
+
+    print("Caricamento dataset...")
+
+    full_dataset = ChessDataset(DATA_PATH, vectorizer=None)
+
+    train_len = int(0.8 * len(full_dataset))
+    test_len = len(full_dataset) - train_len
+
+    generator = torch.Generator().manual_seed(42)
+    train_set, test_set = random_split(full_dataset, [train_len, test_len], generator=generator)
+
+    configs = [
+        (ChessVanillaCNN(), "vanilla_cnn.pth", 0.0005, StaticFlatVectorizer()),
+        (ChessResNet(num_blocks=8), "resnet_8.pth", 0.0005, PerspectiveVectorizer()),
+        (DeepChessResNet(num_blocks=20), "resnet_20.pth", 0.0004, PerspectiveVectorizer()),
+        (TransformerChessEval(), "transformer_encoder.pth", 0.0001, PerspectiveVectorizer())
+    ]
+
+    for model, filename, lr, vectorizer in configs:
+        print(f" TRAINING: {model.__class__.__name__} ")
+        print(f" Vectorizer in uso: {vectorizer.__class__.__name__} ({vectorizer.layers} canali)")
+
+        full_dataset.vectorizer = vectorizer
+
+        training_loop(filename, model, train_set, test_set, device, lr)
 
 if __name__ == '__main__':
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu") 
-    
-    path_model = "src/chess_model3.pth" 
-    
-    model = DeepChessNet(num_blocks=20) 
-    
-    encoder = PerspectiveResEncoder()
-    
-    # Percorso del dataset su Kaggle
-    dataset_path = "/kaggle/input/datasets/ronakbadhe/chess-evaluations/chessData.csv"
-    
-    if os.path.exists(dataset_path):
-        dataset = ChessDataset(dataset_path, encoder=encoder)
-        training_and_validation(path_model, model, dataset, device=device, batch_size=1024, epochs=50)
-    else:
-        print(f"Errore: Dataset non trovato in {dataset_path}")
+    main()

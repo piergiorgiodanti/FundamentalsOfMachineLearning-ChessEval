@@ -3,7 +3,7 @@ from torch.utils.data import Dataset
 import pandas as pd
 from abc import ABC, abstractmethod
 
-class BaseChessEncoder(ABC):
+class BaseChessVectorizer(ABC):
     """
     Interfaccia astratta per la definizione degli encoder scacchistici.
     """
@@ -29,7 +29,7 @@ class BaseChessEncoder(ABC):
         val = torch.atanh(torch.clamp(model_output, -0.999, 0.999)).item()
         return val * self.scale
 
-class StaticFlatEncoder(BaseChessEncoder):
+class StaticFlatVectorizer(BaseChessVectorizer):
     """
     Codifica a 18 canali con prospettiva fissa, sempre dal punto di vista del Bianco.
     Canali 0-11: pezzi; 12: turno; 13-16: arrocchi; 17: En Passant.
@@ -73,7 +73,7 @@ class StaticFlatEncoder(BaseChessEncoder):
             tensor[self.CH_EP, r, c] = 1
         return tensor
 
-class PerspectiveResEncoder(BaseChessEncoder):
+class PerspectiveVectorizer(BaseChessVectorizer):
     """
     Codifica a 17 canali orientata al giocatore di turno.
     I canali 0-5 rappresentano sempre i pezzi del giocatore attivo.
@@ -133,9 +133,9 @@ class ChessDataset(Dataset):
     """
     Classe per la gestione del dataset scacchistico da sorgente CSV.
     """
-    def __init__(self, csv_file, encoder: BaseChessEncoder):
+    def __init__(self, csv_file, vectorizer: BaseChessVectorizer):
         self.data = pd.read_csv(csv_file)
-        self.encoder = encoder
+        self.vectorizer = vectorizer
     
     def __len__(self):
         """Restituisce il numero totale di campioni nel dataset."""
@@ -156,4 +156,4 @@ class ChessDataset(Dataset):
                 score = 0.0 # Gestione di eventuali valori non conformi
         
         # Esecuzione del processamento tramite l'encoder iniettato
-        return self.encoder.process_entry(fen, score)
+        return self.vectorizer.process_entry(fen, score)
