@@ -97,10 +97,10 @@ def main():
     train_set, test_set = random_split(full_dataset, [train_len, test_len], generator=generator)
 
     configs = [
-        (ChessVanillaCNN(), "vanilla_cnn.pth", 0.0005, StaticFlatVectorizer()),
-        (ChessResNet(num_blocks=8), "resnet_8.pth", 0.0005, PerspectiveVectorizer()),
-        (DeepChessResNet(num_blocks=20), "resnet_20.pth", 0.0004, PerspectiveVectorizer()),
-        (TransformerChessEval(), "transformer_encoder.pth", 0.0001, PerspectiveVectorizer())
+        (ChessVanillaCNN(), "../models/vanilla_cnn.pth", 0.0005, StaticFlatVectorizer()),
+        (ChessResNet(num_blocks=8), "../models/resnet_8.pth", 0.0005, PerspectiveVectorizer()),
+        (DeepChessResNet(num_blocks=20), "../models/resnet_20.pth", 0.0004, PerspectiveVectorizer()),
+        (TransformerChessEval(), "../models/transformer_encoder.pth", 0.0001, PerspectiveVectorizer())
     ]
 
     for model, filename, lr, vectorizer in configs:
