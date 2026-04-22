@@ -13,7 +13,7 @@ BATCH_SIZE = 2048
 EPOCHS = 10
 DATA_PATH = "../data/chessData.csv"
 
-def training_loop(path_model, model, train_set, test_set, device, lr):
+def training_loop(path_model, model, train_set, test_set, device, lr, dumpfilename):
     train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=4, pin_memory=True)
     test_loader = DataLoader(test_set, batch_size=BATCH_SIZE, shuffle=False, num_workers=4, pin_memory=True)
 
@@ -52,6 +52,7 @@ def training_loop(path_model, model, train_set, test_set, device, lr):
             running_loss += loss.item()
             if i % STEPS_PRINT == (STEPS_PRINT - 1):
                 print(f'[Epoca {epoch + 1}, Batch {i + 1}] Loss: {running_loss / STEPS_PRINT:.4f}')
+                last_runngin_loss = running_loss
                 running_loss = 0.0
 
         # Validation
@@ -65,6 +66,8 @@ def training_loop(path_model, model, train_set, test_set, device, lr):
 
         avg_loss = test_loss / len(test_loader)
         print(f'>>> Fine Epoca {epoch + 1} - Val Loss: {avg_loss:.4f}')
+
+        dumpfilename.append(epoch, last_runngin_loss, avg_loss)
 
         if avg_loss < best_test_loss:
             best_test_loss = avg_loss
@@ -97,19 +100,20 @@ def main():
     train_set, test_set = random_split(full_dataset, [train_len, test_len], generator=generator)
 
     configs = [
-        (ChessVanillaCNN(), "../models/vanilla_cnn.pth", 0.0005, StaticFlatVectorizer()),
-        (ChessResNet(num_blocks=8), "../models/resnet_8.pth", 0.0005, PerspectiveVectorizer()),
-        (DeepChessResNet(num_blocks=20), "../models/resnet_20.pth", 0.0004, PerspectiveVectorizer()),
-        (TransformerChessEval(), "../models/transformer_encoder.pth", 0.0001, PerspectiveVectorizer())
+        (ChessVanillaCNN(), "../models/vanilla_cnn.pth", 0.0005, StaticFlatVectorizer(), "../dump/dump_vanilla_cnn.csv"),
+        (ChessResNet(num_blocks=8), "../models/resnet_8.pth", 0.0005, PerspectiveVectorizer(), "../dump/dump_resnet_8.csv"),
+        (DeepChessResNet(num_blocks=20), "../models/resnet_20.pth", 0.0004, PerspectiveVectorizer(), "../dump/dump_resnet_20.csv"),
+        (TransformerChessEval(), "../models/transformer_encoder.pth", 0.0001, PerspectiveVectorizer(), "../dump/dump_transformer_encoder.csv")
     ]
 
-    for model, filename, lr, vectorizer in configs:
+    for model, filename, lr, vectorizer, dumpfilename in configs:
         print(f" TRAINING: {model.__class__.__name__} ")
         print(f" Vectorizer in uso: {vectorizer.__class__.__name__} ({vectorizer.layers} canali)")
+        dumpfilename.append("epoch", "train", "validation")
 
         full_dataset.vectorizer = vectorizer
 
-        training_loop(filename, model, train_set, test_set, device, lr)
+        training_loop(filename, model, train_set, test_set, device, lr, dumpfilename)
 
 if __name__ == '__main__':
     main()
