@@ -4,6 +4,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, random_split
 import os
 import gc
+import pandas as pd
 
 from models import ChessVanillaCNN, ChessResNet, DeepChessResNet, TransformerChessEval
 from data_utils import ChessDataset, PerspectiveVectorizer, StaticFlatVectorizer
@@ -14,8 +15,11 @@ EPOCHS = 10
 DATA_PATH = "../data/chessData.csv"
 
 def training_loop(path_model, model, train_set, test_set, device, lr, dumpfilename):
+
+    logs = []
+
     train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=4, pin_memory=True)
-    test_loader = DataLoader(test_set, batch_size=BATCH_SIZE, shuffle=False, num_workers=4, pin_memory=True)
+    val_loader = DataLoader(test_set, batch_size=BATCH_SIZE, shuffle=False, num_workers=4, pin_memory=True)
 
     net = model.to(device)
 
@@ -28,7 +32,7 @@ def training_loop(path_model, model, train_set, test_set, device, lr, dumpfilena
 
     scaler = torch.amp.GradScaler('cuda')
 
-    best_test_loss = float('inf')
+    best_val_loss = float('inf')
     patience = 3
     trigger_times = 0
 
@@ -51,26 +55,26 @@ def training_loop(path_model, model, train_set, test_set, device, lr, dumpfilena
 
             running_loss += loss.item()
             if i % STEPS_PRINT == (STEPS_PRINT - 1):
-                print(f'[Epoca {epoch + 1}, Batch {i + 1}] Loss: {running_loss / STEPS_PRINT:.4f}')
-                last_runngin_loss = running_loss
+                avg_train_loss = running_loss / STEPS_PRINT
+                print(f'[Epoca {epoch + 1}, Batch {i + 1}] Loss: {avg_train_loss:.4f}')
                 running_loss = 0.0
 
         # Validation
         net.eval()
-        test_loss = 0.0
+        val_loss = 0.0
         with torch.no_grad(), torch.amp.autocast('cuda'):
-            for inputs, labels in test_loader:
+            for inputs, labels in val_loader:
                 inputs, labels = inputs.to(device), labels.to(device).float().view(-1, 1)
                 outputs = net(inputs)
-                test_loss += criterion(outputs, labels).item()
+                val_loss += criterion(outputs, labels).item()
 
-        avg_loss = test_loss / len(test_loader)
-        print(f'>>> Fine Epoca {epoch + 1} - Val Loss: {avg_loss:.4f}')
+        avg_val_loss = val_loss / len(val_loader)
+        print(f'>>> Fine Epoca {epoch + 1} - Val Loss: {avg_val_loss:.4f}')
 
-        dumpfilename.append(epoch, last_runngin_loss, avg_loss)
+        logs.append([epoch, avg_train_loss, avg_val_loss])
 
-        if avg_loss < best_test_loss:
-            best_test_loss = avg_loss
+        if avg_val_loss < best_val_loss:
+            best_val_loss = avg_val_loss
             torch.save(net.state_dict(), path_model)
             print("Modello salvato.")
             trigger_times = 0
@@ -81,9 +85,11 @@ def training_loop(path_model, model, train_set, test_set, device, lr, dumpfilena
                 break
 
     # Pulizia memoria per prossimo modello
-    del net, optimizer, train_loader, test_loader
+    del net, optimizer, train_loader, val_loader
     gc.collect()
     torch.cuda.empty_cache()
+
+    return logs
 
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -109,11 +115,12 @@ def main():
     for model, filename, lr, vectorizer, dumpfilename in configs:
         print(f" TRAINING: {model.__class__.__name__} ")
         print(f" Vectorizer in uso: {vectorizer.__class__.__name__} ({vectorizer.layers} canali)")
-        dumpfilename.append("epoch", "train", "validation")
 
         full_dataset.vectorizer = vectorizer
 
-        training_loop(filename, model, train_set, test_set, device, lr, dumpfilename)
+        logs = training_loop(filename, model, train_set, test_set, device, lr, dumpfilename)
+
+        df = pd.Dataframe(logs, columns=["epoch", "train_loss", "val_loss"])
 
 if __name__ == '__main__':
     main()
