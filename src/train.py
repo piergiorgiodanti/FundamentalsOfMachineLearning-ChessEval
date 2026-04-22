@@ -55,8 +55,7 @@ def training_loop(path_model, model, train_set, test_set, device, lr, dumpfilena
             scaler.update()
 
             running_loss += loss.item()
-            #if i % STEPS_PRINT == (STEPS_PRINT - 1):
-            avg_train_loss = running_loss / STEPS_PRINT
+            avg_train_loss = running_loss
             print(f'[Epoca {epoch + 1}, Batch {i + 1}] Loss: {avg_train_loss:.4f}')
             running_loss = 0.0
 
