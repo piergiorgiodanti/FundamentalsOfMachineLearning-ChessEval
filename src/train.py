@@ -39,6 +39,7 @@ def training_loop(path_model, model, train_set, test_set, device, lr, dumpfilena
     for epoch in range(EPOCHS):
         net.train()
         running_loss = 0.0
+        avg_train_loss = 0.0
 
         for i, (inputs, labels) in enumerate(train_loader):
             inputs, labels = inputs.to(device), labels.to(device).float().view(-1, 1)
@@ -120,7 +121,8 @@ def main():
 
         logs = training_loop(filename, model, train_set, test_set, device, lr, dumpfilename)
 
-        df = pd.Dataframe(logs, columns=["epoch", "train_loss", "val_loss"])
+        df = pd.DataFrame(logs, columns=["epoch", "train_loss", "val_loss"])
+        df.to_csv(dumpfilename, index=False)
 
 if __name__ == '__main__':
     main()
