@@ -1,6 +1,5 @@
 # Cartelle pesanti o locali
 data/*chessData.csv*
-models_saved/
 __pycache__/
 .ipynb_checkpoints/
 .vscode/
