@@ -106,10 +106,10 @@ def main():
     train_set, test_set = random_split(full_dataset, [train_len, test_len], generator=generator)
 
     configs = [
-        (ChessVanillaCNN(), "../models/vanilla_cnn.pth", 0.0005, StaticFlatVectorizer(), "../dump/dump_vanilla_cnn.csv"),
-        (ChessResNet(num_blocks=8), "../models/resnet_8.pth", 0.0005, PerspectiveVectorizer(), "../dump/dump_resnet_8.csv"),
-        (DeepChessResNet(num_blocks=20), "../models/resnet_20.pth", 0.0004, PerspectiveVectorizer(), "../dump/dump_resnet_20.csv"),
-        (TransformerChessEval(), "../models/transformer_encoder.pth", 0.0001, PerspectiveVectorizer(), "../dump/dump_transformer_encoder.csv")
+        (ChessVanillaCNN(), "../models_saved/vanilla_cnn.pth", 0.0005, StaticFlatVectorizer(), "../dump/dump_vanilla_cnn.csv"),
+        (ChessResNet(num_blocks=8), "../models_saved/resnet_8.pth", 0.0005, PerspectiveVectorizer(), "../dump/dump_resnet_8.csv"),
+        (DeepChessResNet(num_blocks=20), "../models_saved/resnet_20.pth", 0.0004, PerspectiveVectorizer(), "../dump/dump_resnet_20.csv"),
+        (TransformerChessEval(), "../models_saved/transformer_encoder.pth", 0.0001, PerspectiveVectorizer(), "../dump/dump_transformer_encoder.csv")
     ]
 
     for model, filename, lr, vectorizer, dumpfilename in configs:
